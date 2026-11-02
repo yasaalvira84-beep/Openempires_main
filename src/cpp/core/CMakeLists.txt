@@ -32,7 +32,7 @@ target_link_libraries(core PUBLIC
     readerwriterqueue
     EnTT::EnTT
     SDL3::SDL3
-    SDL3_ttf::SDL3_ttf
+    $<IF:$<TARGET_EXISTS:SDL3_ttf::SDL3_ttf>,SDL3_ttf::SDL3_ttf,SDL3_ttf::SDL3_ttf-static>
     $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
     sdl3_gfx
     imgui::imgui
