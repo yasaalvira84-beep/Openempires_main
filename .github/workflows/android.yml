@@ -70,10 +70,19 @@ jobs:
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_CXX_FLAGS="-DFMT_CONSTEVAL=" \
             -DOE_USE_PYTHON=OFF
 
       - name: Build native library
-        run: cmake --build build-android --target openEmpires -j"$(nproc)"
+        run: |
+          set -o pipefail
+          cmake --build build-android --target openEmpires -j"$(nproc)" 2>&1 | tee build-android.log
+
+      # Ringkasan galat kompilasi (pendek), supaya mudah dibaca di HP
+      - name: Show compile errors
+        if: failure()
+        run: |
+          grep -nE "error:|FAILED:" build-android.log 2>/dev/null | cut -c1-300 | head -40 || true
 
       - name: Collect native libraries
         run: |
@@ -113,6 +122,7 @@ jobs:
         with:
           name: build-logs
           path: |
+            build-android.log
             vcpkg/buildtrees/**/*.log
             build-android/vcpkg-manifest-install.log
             build-android/CMakeFiles/CMakeConfigureLog.yaml
