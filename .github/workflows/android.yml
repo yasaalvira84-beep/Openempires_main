@@ -38,9 +38,18 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      # NDK dan Android SDK sudah terpasang di runner GitHub
-      - name: Use preinstalled NDK
-        run: echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      # NDK 27 (Clang 18): seangkatan dengan fmt 11.0.2 dari vcpkg. NDK terbaru (Clang 21)
+      # gagal mengompilasi FMT_STRING di spdlog dengan galat "call to consteval function".
+      - name: Select NDK 27
+        run: |
+          NDK=$(ls -d "$ANDROID_HOME"/ndk/27.* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$NDK" ]; then
+            echo "NDK 27 tidak ada di runner (yang ada: $(ls "$ANDROID_HOME"/ndk | tr '\n' ' ')), memasang..."
+            yes | "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.2.12479018" > /dev/null
+            NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          fi
+          echo "Memakai NDK: $NDK"
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
 
       - name: Cache vcpkg binaries
         uses: actions/cache@v4
@@ -59,8 +68,7 @@ jobs:
         run: python tools/export_models.py assets/scripts assets/scripts/models.json
 
       # CMAKE_CXX_FLAGS:
-      #  - FMT_USE_CONSTEVAL=0 : matikan pengecekan format string saat kompilasi (fmt 11 + Clang)
-      #  - -include android_compat.h : header standar yang di MSVC masuk diam-diam (mis. <list>)
+      #  -include android_compat.h : header standar yang di MSVC masuk diam-diam (mis. <list>)
       - name: Configure
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
@@ -73,7 +81,7 @@ jobs:
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-28 \
-            -DCMAKE_CXX_FLAGS="-DFMT_USE_CONSTEVAL=0 -include $PWD/src/cpp/android_compat.h" \
+            -DCMAKE_CXX_FLAGS="-include $PWD/src/cpp/android_compat.h" \
             -DOE_USE_PYTHON=OFF
 
       - name: Build native library
