@@ -14,6 +14,16 @@ set(PROJECT_VERSION_PATCH 0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ON  : definisi entitas dibaca dari Python tertanam (perilaku desktop lama)
+# OFF : definisi entitas dibaca dari assets/scripts/models.json (dibuat oleh
+#       tools/export_models.py), tanpa Python di dalam game. Dipakai untuk Android.
+option(OE_USE_PYTHON "Embed Python to load entity definitions" ON)
+
+if(ANDROID)
+    # std::stop_token/stop_source masih berlabel eksperimental di libc++ versi NDK lama
+    add_compile_options(-fexperimental-library)
+endif()
+
 if(MSVC)
 # Explicitly setting the flags to force static runtime. CMAKE_MSVC_RUNTIME_LIBRARY didn't work.
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd /W1") #  Temporarilty lowering to make the build faster
@@ -25,8 +35,11 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 add_subdirectory(src)
-add_subdirectory(tests)
-add_subdirectory(integ-tests)
+if(OE_USE_PYTHON)
+    # Tes saat ini memakai Python tertanam
+    add_subdirectory(tests)
+    add_subdirectory(integ-tests)
+endif()
 
 include(ClangFormatUtils)
 # Define patterns and ignore file

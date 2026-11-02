@@ -9,13 +9,24 @@
         "sdl3-renderer-binding"
       ]
     },
-    "pybind11",
+    "nlohmann-json",
     "readerwriterqueue",
     "sdl3",
     "sdl3-image",
     "sdl3-ttf",
     "spdlog"
   ],
+  "default-features": [
+    "python"
+  ],
+  "features": {
+    "python": {
+      "description": "Embedded Python for entity definitions (desktop builds)",
+      "dependencies": [
+        "pybind11"
+      ]
+    }
+  },
   "overrides": [
     {
       "$comment": "From imgui 1.92 due to font and texture update, multithreading is not possible. https://github.com/ocornut/imgui/issues/8597",
