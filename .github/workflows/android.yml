@@ -58,6 +58,9 @@ jobs:
       - name: Export entity models
         run: python tools/export_models.py assets/scripts assets/scripts/models.json
 
+      # CMAKE_CXX_FLAGS:
+      #  - FMT_USE_CONSTEVAL=0 : matikan pengecekan format string saat kompilasi (fmt 11 + Clang)
+      #  - -include android_compat.h : header standar yang di MSVC masuk diam-diam (mis. <list>)
       - name: Configure
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
@@ -70,7 +73,7 @@ jobs:
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-28 \
-            -DCMAKE_CXX_FLAGS="-DFMT_CONSTEVAL=" \
+            -DCMAKE_CXX_FLAGS="-DFMT_USE_CONSTEVAL=0 -include $PWD/src/cpp/android_compat.h" \
             -DOE_USE_PYTHON=OFF
 
       - name: Build native library
