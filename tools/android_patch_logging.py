@@ -3,7 +3,8 @@
 
 1. tcp_sink.h: spdlog di Linux/Android hanya punya connect(host, port) dengan 2 argumen,
    sedangkan kode asli (ditulis untuk klien TCP Windows) memanggilnya dengan 3 argumen.
-2. Logger.cpp: sink TCP (localhost:5000, alat debug) dilewati di Android karena tidak ada penerimanya.
+2. Logger.cpp: sink TCP (localhost:5000, alat debug) dilewati di Android karena tidak ada penerimanya;
+   sebagai gantinya log dikirim ke logcat (android_sink).
 """
 
 CORE = 'src/cpp/core/logging/'
@@ -32,10 +33,18 @@ edit(CORE + 'tcp_sink.h', [
 ])
 
 edit(CORE + 'Logger.cpp', [
+    ('#include "logging/tcp_sink.h"\n',
+     '#include "logging/tcp_sink.h"\n'
+     '#ifdef __ANDROID__\n'
+     '#include <spdlog/sinks/android_sink.h>\n'
+     '#endif\n', 1),
     ('    spdlog::sinks_init_list sinks{consoleSink, fileSink, tcpSink};\n',
      '#ifdef __ANDROID__\n'
-     '    // Tidak ada penerima log TCP di Android\n'
-     '    spdlog::sinks_init_list sinks{consoleSink, fileSink};\n'
+     '    // Tidak ada penerima log TCP di Android; stdout tidak terlihat di Android, jadi log\n'
+     '    // dikirim ke logcat (dibaca oleh LogActivity)\n'
+     '    auto androidSink = std::make_shared<spdlog::sinks::android_sink_mt>("OpenEmpires");\n'
+     '    androidSink->set_level(spdlog::level::trace);\n'
+     '    spdlog::sinks_init_list sinks{consoleSink, fileSink, androidSink};\n'
      '#else\n'
      '    spdlog::sinks_init_list sinks{consoleSink, fileSink, tcpSink};\n'
      '#endif\n', 1),

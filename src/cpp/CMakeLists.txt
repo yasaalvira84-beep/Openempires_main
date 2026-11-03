@@ -25,6 +25,11 @@ target_link_libraries(openEmpires
         sdl3_gfx
 )
 
+if(ANDROID)
+    # liblog: dibutuhkan sink logcat spdlog (android_sink)
+    target_link_libraries(openEmpires PRIVATE log)
+endif()
+
 target_include_directories(openEmpires
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/drs

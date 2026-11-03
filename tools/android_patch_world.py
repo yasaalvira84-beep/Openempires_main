@@ -3,7 +3,8 @@
 
 Peta demo bawaan hanya 50x50 petak, terlalu kecil di layar HP. Skrip ini memakai ukuran TINY
 (120x120 petak) dan menggeser posisi awal unit dan tambang ke tengah peta supaya kamera
-(yang mulai di tengah peta) tetap menghadap unit-unit tersebut.
+(yang mulai di tengah peta) tetap menghadap unit-unit tersebut. Dua villager juga dijadikan
+milik pemain 1 (pemain manusia) karena di Android hanya ada satu pemain yang dikendalikan.
 
 Dijalankan otomatis oleh .github/workflows/android.yml (tools/android_patch_*.py).
 """
@@ -51,8 +52,8 @@ patch('src/cpp/game/DemoWorldCreator.cpp', [
      '    const int o = static_cast<int>(m_settings->getWorldSizeInTiles().width) / 2 - 25;\n'),
     ('getResourceType("stone"), 30, 30, 4)', 'getResourceType("stone"), 30 + o, 30 + o, 4)'),
     ('getResourceType("gold"), 20, 30, 4)', 'getResourceType("gold"), 20 + o, 30 + o, 4)'),
-    ('createVillager(players[1], Tile(24, 22));', 'createVillager(players[1], Tile(24 + o, 22 + o));'),
-    ('createVillager(players[1], Tile(25, 21));', 'createVillager(players[1], Tile(25 + o, 21 + o));'),
+    ('createVillager(players[1], Tile(24, 22));', 'createVillager(players[0], Tile(24 + o, 22 + o));'),
+    ('createVillager(players[1], Tile(25, 21));', 'createVillager(players[0], Tile(25 + o, 21 + o));'),
     ('createMilitaryUnit("militia", players[0], Tile(20, 25));',
      'createMilitaryUnit("militia", players[0], Tile(20 + o, 25 + o));'),
     ('createMilitaryUnit("militia", players[0], Tile(21, 21));',

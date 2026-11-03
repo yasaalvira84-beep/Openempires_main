@@ -20,6 +20,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Menampilkan log setelah game berhenti tidak normal -->
+        <activity
+            android:name=".LogActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <activity
             android:name=".GameActivity"
             android:exported="false"
