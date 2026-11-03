@@ -69,6 +69,8 @@ jobs:
 
       # CMAKE_CXX_FLAGS:
       #  -include android_compat.h : header standar yang di MSVC masuk diam-diam (mis. <list>)
+      #  -Wno-c++11-narrowing      : Clang menganggap konversi int->float di dalam { } sebagai
+      #                              galat, MSVC hanya memberi peringatan
       - name: Configure
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
@@ -81,19 +83,23 @@ jobs:
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-28 \
-            -DCMAKE_CXX_FLAGS="-include $PWD/src/cpp/android_compat.h" \
+            -DCMAKE_CXX_FLAGS="-include $PWD/src/cpp/android_compat.h -Wno-c++11-narrowing" \
             -DOE_USE_PYTHON=OFF
 
       - name: Build native library
         run: |
           set -o pipefail
-          cmake --build build-android --target openEmpires -j"$(nproc)" 2>&1 | tee build-android.log
+          # -k 0: lanjutkan setelah galat pertama supaya semua galat terkumpul dalam satu run
+          cmake --build build-android --target openEmpires -j"$(nproc)" -- -k 0 2>&1 | tee build-android.log
 
       # Ringkasan galat kompilasi (pendek), supaya mudah dibaca di HP
       - name: Show compile errors
         if: failure()
         run: |
-          grep -nE "error:|FAILED:" build-android.log 2>/dev/null | cut -c1-300 | head -40 || true
+          echo "== File yang gagal dikompilasi =="
+          grep -E "^FAILED:" build-android.log 2>/dev/null | cut -c1-200 | head -30 || true
+          echo "== Galat unik =="
+          grep -E "error:" build-android.log 2>/dev/null | sed 's#/home/runner/work/[^/]*/[^/]*/##' | cut -c1-240 | awk '!seen[$0]++' | head -60 || true
 
       - name: Collect native libraries
         run: |
