@@ -9,8 +9,10 @@
 //                                tools/export_models.py (mis. build Android).
 
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <unordered_map>
 #include <vector>
 
@@ -102,9 +104,16 @@ template <typename T> T as(const ModelRef& value)
             result.emplace(std::stoi(it.key()), it.value().template get<typename T::mapped_type>());
         return result;
     }
-    else
+    else if constexpr (requires { value.template get<T>(); })
     {
         return value.template get<T>();
+    }
+    else
+    {
+        // Tipe ini tidak punya konversi dari JSON. Biasanya pemetaannya memakai fungsi konverter
+        // sendiri, sehingga cabang ini tidak pernah dijalankan. Di build Python, cast() juga baru
+        // gagal saat dijalankan, jadi perilakunya setara.
+        throw std::runtime_error(std::string("Cannot convert JSON value to type: ") + typeid(T).name());
     }
 }
 
