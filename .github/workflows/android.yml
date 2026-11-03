@@ -18,12 +18,14 @@ jobs:
 
       # Repo ini hanya berisi file yang kita ubah atau tambah. Kode asli OpenEmpires diambil di
       # commit yang sama dengan yang dipatch, lalu perubahan diterapkan di atasnya.
+      # Patch tambahan: cukup tambah file tools/android_patch_*.py, otomatis dijalankan.
       - name: Fetch OpenEmpires base and apply patch
         run: |
           git clone https://github.com/OpenEmpiresProject/OpenEmpires.git base-src
           git -C base-src checkout c56fb6cd3c48d88d992276763242aafc15c73676
           rsync -a --ignore-existing --exclude '.git' --exclude '.github' base-src/ ./
           python3 tools/apply_android_patch.py
+          for f in tools/android_patch_*.py; do python3 "$f"; done
 
       - uses: actions/setup-python@v5
         with:
@@ -68,12 +70,15 @@ jobs:
         run: python tools/export_models.py assets/scripts assets/scripts/models.json
 
       # CMAKE_CXX_FLAGS:
-      #  -include android_compat.h : header standar yang di MSVC masuk diam-diam (mis. <list>)
-      #  -Wno-c++11-narrowing      : Clang menganggap konversi int->float di dalam { } sebagai
-      #                              galat, MSVC hanya memberi peringatan
+      #  -include android_compat.h   : header standar yang di MSVC masuk diam-diam (mis. <list>)
+      #  android/extra-cxx-flags.txt : flag tambahan (mis. -Wno-c++11-narrowing: Clang menganggap
+      #                                int->float di dalam { } galat, MSVC hanya peringatan)
+      # GENERATED_DIR: CMake asli baru mengisinya setelah add_subdirectory(src), jadi kosong
+      #                pada konfigurasi pertama di CI yang bersih
       - name: Configure
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
+          EXTRA_CXX="$(tr '\n' ' ' < android/extra-cxx-flags.txt)"
           cmake -S . -B build-android -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
@@ -83,7 +88,8 @@ jobs:
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-28 \
-            -DCMAKE_CXX_FLAGS="-include $PWD/src/cpp/android_compat.h -Wno-c++11-narrowing" \
+            -DGENERATED_DIR="$PWD/build-android/generated" \
+            -DCMAKE_CXX_FLAGS="-include $PWD/src/cpp/android_compat.h $EXTRA_CXX" \
             -DOE_USE_PYTHON=OFF
 
       - name: Build native library
