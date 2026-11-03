@@ -31,6 +31,8 @@ import java.util.Map;
  *  2. Jika graphics.drs, terrain.drs, atau interfac.drs belum ada, pengguna cukup memilih SATU
  *     folder (mis. folder Data milik AoE2); ketiga file dicari otomatis sampai beberapa tingkat
  *     subfolder. Pemilihan file satu per satu tetap tersedia sebagai cadangan.
+ *  3. Jika game sebelumnya tidak berhenti normal (penanda masih ada), LogActivity dibuka lebih dulu
+ *     supaya log crash bisa dilihat.
  * Tidak butuh izin penyimpanan khusus (memakai pemilih dokumen Android).
  */
 public class SetupActivity extends Activity {
@@ -117,7 +119,13 @@ public class SetupActivity extends Activity {
     private void checkDrsAndContinue(String note) {
         List<String> missing = missingDrs();
         if (missing.isEmpty()) {
-            startActivity(new Intent(this, GameActivity.class));
+            if (GameActivity.flagFile(this).exists()) {
+                // Game sebelumnya tidak berhenti normal (crash?): tampilkan log, bukan langsung game
+                startActivity(new Intent(this, LogActivity.class));
+            } else {
+                GameActivity.markRunning(this);
+                startActivity(new Intent(this, GameActivity.class));
+            }
             finish();
             return;
         }
