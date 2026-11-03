@@ -5,6 +5,7 @@ Peta demo bawaan hanya 50x50 petak, terlalu kecil di layar HP. Skrip ini memakai
 (120x120 petak) dan menggeser posisi awal unit dan tambang ke tengah peta supaya kamera
 (yang mulai di tengah peta) tetap menghadap unit-unit tersebut. Dua villager juga dijadikan
 milik pemain 1 (pemain manusia) karena di Android hanya ada satu pemain yang dikendalikan.
+Tiga villager awal pemain 2 (musuh) ditaruh di sudut peta untuk AI (src/cpp/game/EnemyAI.h).
 
 Dijalankan otomatis oleh .github/workflows/android.yml (tools/android_patch_*.py).
 """
@@ -62,5 +63,17 @@ patch('src/cpp/game/DemoWorldCreator.cpp', [
      'createMilitaryUnit("archer", players[0], Tile(21 + o, 25 + o));'),
     ('createMilitaryUnit("archer", players[0], Tile(21, 17));',
      'createMilitaryUnit("archer", players[0], Tile(21 + o, 17 + o));'),
+    # Pangkalan musuh di sudut peta: tiga villager awal milik pemain 2 (dikendalikan EnemyAI.h)
+    ('    registerVillagerActions();\n    createHUD();\n',
+     '    {\n'
+     '        const int ex = static_cast<int>(m_settings->getWorldSizeInTiles().width) - 25;\n'
+     '        if (ex > 40)\n'
+     '        {\n'
+     '            createVillager(players[1], Tile(ex, ex));\n'
+     '            createVillager(players[1], Tile(ex + 1, ex));\n'
+     '            createVillager(players[1], Tile(ex, ex + 1));\n'
+     '        }\n'
+     '    }\n'
+     '    registerVillagerActions();\n    createHUD();\n'),
 ])
 print('Patch peta diterapkan.')
