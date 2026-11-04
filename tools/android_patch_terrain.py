@@ -7,9 +7,10 @@ bawaan) berdampingan di area awal: 7 kolom (arah +x) x 5 baris (arah +y), diurut
 SLP (baris demi baris). Area itu dibuka dari kabut perang. Dari screenshot, jenis medan tiap nomor
 bisa dipetakan lalu dipakai untuk peta sungguhan.
 
-Nomor SLP yang ternyata tidak ada di terrain.drs dilewati (slotnya tetap rumput biasa) dan daftar
-nomor yang ada/tidak ada dicatat ke log. Pemuat grafis dan getBoundingBox dibuat tahan terhadap SLP
-yang tidak ada (sebelumnya "Resource not found" membuat game crash saat memulai).
+Nomor SLP yang ternyata tidak ada di terrain.drs, atau punya kurang dari 100 gambar (bukan medan
+penuh), dilewati (slotnya tetap rumput biasa) dan daftarnya dicatat ke log. Pemuat grafis dan
+getBoundingBox dibuat tahan terhadap SLP yang tidak ada (sebelumnya "Resource not found" membuat
+game crash saat memulai).
 
 Dijalankan otomatis oleh .github/workflows/android.yml (tools/android_patch_*.py).
 Hapus file ini untuk mematikan peta uji.
@@ -45,7 +46,7 @@ NEW_FUNCTIONS = r'''
 EntityTypes DemoWorldCreator::terrainTypeAt(uint32_t x, uint32_t y)
 {
     // Slot tetap per nomor SLP: slot 0 = 15000, slot 1 = 15002, ..., slot 30 = 15031.
-    // Nilai 0 berarti SLP itu tidak ada di terrain.drs (slot dibiarkan rumput biasa).
+    // Nilai 0 berarti SLP itu tidak dipakai (slot dibiarkan rumput biasa).
     static std::vector<uint32_t> probeTypes;
     static bool initialized = false;
     if (!initialized)
@@ -62,31 +63,35 @@ EntityTypes DemoWorldCreator::terrainTypeAt(uint32_t x, uint32_t y)
             if (id == 15001)
                 continue;
 
+            // Satu petak medan memakai 100 variasi (pola 10x10), jadi SLP harus punya >= 100 gambar.
+            // SLP lain (tepi, objek kecil) akan membuat game crash saat digambar.
             bool exists = false;
+            size_t frames = 0;
             if (loaded)
             {
                 try
                 {
-                    terrainDrs.getSLPFile(id);
-                    exists = true;
+                    frames = terrainDrs.getSLPFile(id).getFrameCount();
+                    exists = frames >= 100;
                 }
                 catch (const std::exception&)
                 {
                 }
             }
 
+            const std::string label = std::to_string(id) + "(" + std::to_string(frames) + ") ";
             if (exists)
             {
                 const size_t slot = static_cast<size_t>(id < 15001 ? id - 15000 : id - 15001);
                 probeTypes[slot] = getResourceType("terrain_probe_" + std::to_string(id));
-                present += std::to_string(id) + " ";
+                present += label;
             }
             else
             {
-                missing += std::to_string(id) + " ";
+                missing += label;
             }
         }
-        spdlog::info("Peta uji medan: terrain.drs dimuat={}. SLP ada: {}| SLP tidak ada: {}", loaded,
+        spdlog::info("Peta uji medan: terrain.drs dimuat={}. dipakai (nomor(jumlah gambar)): {}| dilewati: {}", loaded,
                      present, missing);
     }
 
