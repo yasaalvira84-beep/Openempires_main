@@ -7,7 +7,9 @@ bawaan) berdampingan di area awal: 7 kolom (arah +x) x 5 baris (arah +y), diurut
 SLP (baris demi baris). Area itu dibuka dari kabut perang. Dari screenshot, jenis medan tiap nomor
 bisa dipetakan lalu dipakai untuk peta sungguhan.
 
-Juga membuat pemuat SLP tidak crash bila sebuah nomor SLP tidak ada di DRS.
+Nomor SLP yang ternyata tidak ada di terrain.drs dilewati (slotnya tetap rumput biasa) dan daftar
+nomor yang ada/tidak ada dicatat ke log. Pemuat grafis dan getBoundingBox dibuat tahan terhadap SLP
+yang tidak ada (sebelumnya "Resource not found" membuat game crash saat memulai).
 
 Dijalankan otomatis oleh .github/workflows/android.yml (tools/android_patch_*.py).
 Hapus file ini untuk mematikan peta uji.
@@ -17,6 +19,7 @@ MARK = 'OE_ANDROID_TERRAIN_PROBE'
 
 MODELS = 'assets/scripts/models.py'
 LOADER = 'src/cpp/game/DRSGraphicsLoader.cpp'
+DRSIFACE = 'src/cpp/game/DRSInterface.cpp'
 HEADER = 'src/cpp/game/DemoWorldCreator.h'
 SOURCE = 'src/cpp/game/DemoWorldCreator.cpp'
 
@@ -41,14 +44,50 @@ NEW_FUNCTIONS = r'''
 // OE_ANDROID_TERRAIN_PROBE: petak uji jenis medan (lihat tools/android_patch_terrain.py)
 EntityTypes DemoWorldCreator::terrainTypeAt(uint32_t x, uint32_t y)
 {
+    // Slot tetap per nomor SLP: slot 0 = 15000, slot 1 = 15002, ..., slot 30 = 15031.
+    // Nilai 0 berarti SLP itu tidak ada di terrain.drs (slot dibiarkan rumput biasa).
     static std::vector<uint32_t> probeTypes;
-    if (probeTypes.empty())
+    static bool initialized = false;
+    if (!initialized)
     {
+        initialized = true;
+        probeTypes.assign(31, 0);
+
+        drs::DRSFile terrainDrs;
+        const bool loaded = terrainDrs.load("assets/terrain.drs");
+        std::string present;
+        std::string missing;
         for (int id = 15000; id <= 15031; ++id)
         {
-            if (id != 15001)
-                probeTypes.push_back(getResourceType("terrain_probe_" + std::to_string(id)));
+            if (id == 15001)
+                continue;
+
+            bool exists = false;
+            if (loaded)
+            {
+                try
+                {
+                    terrainDrs.getSLPFile(id);
+                    exists = true;
+                }
+                catch (const std::exception&)
+                {
+                }
+            }
+
+            if (exists)
+            {
+                const size_t slot = static_cast<size_t>(id < 15001 ? id - 15000 : id - 15001);
+                probeTypes[slot] = getResourceType("terrain_probe_" + std::to_string(id));
+                present += std::to_string(id) + " ";
+            }
+            else
+            {
+                missing += std::to_string(id) + " ";
+            }
         }
+        spdlog::info("Peta uji medan: terrain.drs dimuat={}. SLP ada: {}| SLP tidak ada: {}", loaded,
+                     present, missing);
     }
 
     const auto size = m_settings->getWorldSizeInTiles();
@@ -61,7 +100,7 @@ EntityTypes DemoWorldCreator::terrainTypeAt(uint32_t x, uint32_t y)
     if (dx >= 0 && dx < 21 && dy >= 0 && dy < 15)
     {
         const size_t index = static_cast<size_t>(dy / 3) * 7 + static_cast<size_t>(dx / 3);
-        if (index < probeTypes.size())
+        if (index < probeTypes.size() && probeTypes[index] != 0)
             return static_cast<EntityTypes>(probeTypes[index]);
     }
     return EntityTypes::ET_TILE;
@@ -125,6 +164,28 @@ patch(LOADER, [
      '        std::vector<SDL_Surface*> surfaces;\n'),
 ])
 
+patch(DRSIFACE, [
+    ('#include "DRSInterface.h"\n',
+     '#include "DRSInterface.h"\n#include <spdlog/spdlog.h>\n'),
+    ('    auto frameInfos = drsFile->getSLPFile(slpId).getFrameInfos();\n'
+     '    auto& frame = frameInfos[frameIndex];\n'
+     '    core::Rect<int> box(frame.hotspot_x, frame.hotspot_y, frame.width, frame.height);\n'
+     '    return box;\n',
+     '    // OE_ANDROID_TERRAIN_PROBE: SLP yang tidak ada di DRS tidak boleh membuat game crash\n'
+     '    try\n'
+     '    {\n'
+     '        auto frameInfos = drsFile->getSLPFile(slpId).getFrameInfos();\n'
+     '        auto& frame = frameInfos[frameIndex];\n'
+     '        core::Rect<int> box(frame.hotspot_x, frame.hotspot_y, frame.width, frame.height);\n'
+     '        return box;\n'
+     '    }\n'
+     '    catch (const std::exception& e)\n'
+     '    {\n'
+     '        spdlog::error("SLP {} tidak bisa dimuat dari {}: {}", slpId, drsFile->getFilename(), e.what());\n'
+     '        return core::Rect<int>(0, 0, 0, 0);\n'
+     '    }\n'),
+])
+
 patch(HEADER, [
     ('    void createTerrain();\n',
      '    void createTerrain();\n'
@@ -133,6 +194,8 @@ patch(HEADER, [
 ])
 
 patch(SOURCE, [
+    ('#include "Coordinates.h"\n',
+     '#include "Coordinates.h"\n#include "DRSFile.h"\n'),
     ('            createTile(i, j, EntityTypes::ET_TILE);\n',
      '            createTile(i, j, terrainTypeAt(i, j)); // OE_ANDROID_TERRAIN_PROBE\n'),
     ('    auto players = createPlayers();\n',
